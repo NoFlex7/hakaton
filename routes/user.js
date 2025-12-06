@@ -9,6 +9,11 @@ router.post('/register', async (req, res) => {
   try {
     const { name, phone, password } = req.body;
 
+    // Fixed: Added input validation
+    if (!name || !phone || !password) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+
     const exists = await User.findOne({ phone });
     if (exists) return res.status(400).json({ message: "User already exists" });
 
@@ -16,7 +21,11 @@ router.post('/register', async (req, res) => {
 
     const user = await User.create({ name, phone, password: hashedPass, wallet: 0 });
 
-    res.json({ message: "User registered", user });
+    // Fixed: Exclude password from response
+    const userResponse = user.toObject();
+    delete userResponse.password;
+
+    res.json({ message: "User registered", user: userResponse });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -29,13 +38,22 @@ router.post('/login', async (req, res) => {
   try {
     const { phone, password } = req.body;
 
+    // Fixed: Added input validation
+    if (!phone || !password) {
+      return res.status(400).json({ message: "Phone and password are required" });
+    }
+
     const user = await User.findOne({ phone });
     if (!user) return res.status(404).json({ message: "User not found" });
 
     const match = await bcrypt.compare(password, user.password);
     if (!match) return res.status(400).json({ message: "Incorrect password" });
 
-    res.json({ message: "Login success", user });
+    // Fixed: Exclude password from response
+    const userResponse = user.toObject();
+    delete userResponse.password;
+
+    res.json({ message: "Login success", user: userResponse });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -46,7 +64,8 @@ router.post('/login', async (req, res) => {
 // =======================
 router.get('/users', async (req, res) => {
   try {
-    const users = await User.find();
+    // Fixed: Exclude passwords from query
+    const users = await User.find().select('-password');
     res.json({ users });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -58,7 +77,8 @@ router.get('/users', async (req, res) => {
 // =======================
 router.get('/user/:userId', async (req, res) => {
   try {
-    const user = await User.findById(req.params.userId);
+    // Fixed: Exclude password from query
+    const user = await User.findById(req.params.userId).select('-password');
 
     if (!user) return res.status(404).json({ message: "User not found" });
 
@@ -75,11 +95,20 @@ router.put('/user/:userId', async (req, res) => {
   try {
     const { name, phone } = req.body;
 
+    // Fixed: Added input validation
+    if (!name && !phone) {
+      return res.status(400).json({ message: "At least one field is required" });
+    }
+
+    const updateData = {};
+    if (name) updateData.name = name;
+    if (phone) updateData.phone = phone;
+
     const user = await User.findByIdAndUpdate(
       req.params.userId,
-      { name, phone },
+      updateData,
       { new: true }
-    );
+    ).select('-password');
 
     if (!user) return res.status(404).json({ message: "User not found" });
 
@@ -125,11 +154,23 @@ router.post('/wallet/add', async (req, res) => {
   try {
     const { userId, amount } = req.body;
 
-    const user = await User.findById(userId);
-    if (!user) return res.status(404).json({ message: "User not found" });
+    // Fixed: Added input validation
+    if (!userId || amount === undefined) {
+      return res.status(400).json({ message: "UserId and amount are required" });
+    }
 
-    user.wallet += Number(amount);
-    await user.save();
+    if (amount <= 0) {
+      return res.status(400).json({ message: "Amount must be positive" });
+    }
+
+    // Fixed: Use atomic update to prevent race conditions
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { $inc: { wallet: Number(amount) } },
+      { new: true }
+    );
+
+    if (!user) return res.status(404).json({ message: "User not found" });
 
     res.json({ message: "Amount added", wallet: user.wallet });
   } catch (e) {
@@ -144,16 +185,30 @@ router.post('/wallet/remove', async (req, res) => {
   try {
     const { userId, amount } = req.body;
 
+    // Fixed: Added input validation
+    if (!userId || amount === undefined) {
+      return res.status(400).json({ message: "UserId and amount are required" });
+    }
+
+    if (amount <= 0) {
+      return res.status(400).json({ message: "Amount must be positive" });
+    }
+
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    if (user.wallet < amount)
+    if (user.wallet < amount) {
       return res.status(400).json({ message: "Not enough balance" });
+    }
 
-    user.wallet -= Number(amount);
-    await user.save();
+    // Fixed: Use atomic update to prevent race conditions
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { $inc: { wallet: -Number(amount) } },
+      { new: true }
+    );
 
-    res.json({ message: "Amount removed", wallet: user.wallet });
+    res.json({ message: "Amount removed", wallet: updatedUser.wallet });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

@@ -14,10 +14,16 @@ const io = new Server(server, {
   cors: { origin: '*' }
 });
 
-io.on('connection', () => {
-  console.log("Client connected");
+// Fixed: Added socket parameter and disconnect handler
+io.on('connection', (socket) => {
+  console.log("Client connected:", socket.id);
+  
+  socket.on('disconnect', () => {
+    console.log("Client disconnected:", socket.id);
+  });
 });
 
+// Make io accessible to routes
 app.set('io', io);
 
 app.use(cors());
@@ -25,7 +31,7 @@ app.use(express.json());
 
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log("MongoDB connected"))
-  .catch((e) => console.log(e));
+  .catch((e) => console.log("MongoDB connection error:", e));
 
 app.use('/users', usersRoute);
 
@@ -33,6 +39,7 @@ app.get('/', (req, res) => {
   res.send("API working");
 });
 
-server.listen(process.env.PORT, () => {
-  console.log("Server running on port", process.env.PORT);
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log("Server running on port", PORT);
 });
