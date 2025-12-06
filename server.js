@@ -4,15 +4,8 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const http = require('http');
 const { Server } = require('socket.io');
-const userRoute = require('./routes/user');
-const walletRoute = require('./routes/wallet');
-const authRoute = require('./routes/auth');
-const userRoute = require('./routes/user');
-const walletRoute = require('./routes/wallet');
 
-
-const reportsRoute = require('./routes/reports');
-const trafficRoute = require('./routes/traffic');
+const usersRoute = require('./routes/users');
 
 const app = express();
 const server = http.createServer(app);
@@ -30,23 +23,19 @@ app.set('io', io);
 app.use(cors());
 app.use(express.json());
 
-
-
+// MongoDB
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log("MongoDB connected"))
   .catch((e) => console.log(e));
 
-app.use('/reports', reportsRoute);
-app.use('/traffic', trafficRoute);
-app.use('/auth', authRoute);
-app.use('/user', userRoute);
-app.use('/wallet', walletRoute);
-
+// Routes
+app.use('/users', usersRoute);
 
 app.get('/', (req, res) => {
   res.send("API working");
 });
 
+// Start Server
 server.listen(process.env.PORT, () => {
   console.log("Server running on port", process.env.PORT);
 });

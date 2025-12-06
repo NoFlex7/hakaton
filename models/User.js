@@ -1,22 +1,10 @@
-const express = require('express');
-const User = require('../models/User');
-const auth = require('../middleware/authMiddleware');
-const router = express.Router();
+const mongoose = require('mongoose');
 
-router.get('/', auth, async (req, res) => {
-  const user = await User.findById(req.userId).select("-password");
-  res.json(user);
+const UserSchema = new mongoose.Schema({
+  name: { type: String },
+  phone: { type: String, unique: true },
+  password: { type: String },
+  wallet: { type: Number, default: 0 }
 });
 
-router.put('/', auth, async (req, res) => {
-  const { fullName, avatar } = req.body;
-  const user = await User.findByIdAndUpdate(
-    req.userId,
-    { fullName, avatar },
-    { new: true }
-  ).select("-password");
-
-  res.json(user);
-});
-
-module.exports = router;
+module.exports = mongoose.model("User", UserSchema);
