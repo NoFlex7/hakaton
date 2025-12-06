@@ -1,7 +1,9 @@
 const router = require('express').Router();
 const User = require('../models/User');
 
+// =======================
 // Register
+// =======================
 router.post('/register', async (req, res) => {
   try {
     const { name, phone, password } = req.body;
@@ -9,7 +11,7 @@ router.post('/register', async (req, res) => {
     const exists = await User.findOne({ phone });
     if (exists) return res.status(400).json({ message: "User already exists" });
 
-    const user = await User.create({ name, phone, password });
+    const user = await User.create({ name, phone, password, wallet: 0 });
 
     res.json({
       message: "User registered",
@@ -20,7 +22,9 @@ router.post('/register', async (req, res) => {
   }
 });
 
+// =======================
 // Login
+// =======================
 router.post('/login', async (req, res) => {
   try {
     const { phone, password } = req.body;
@@ -37,29 +41,59 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// Wallet balance olish
+// =======================
+// Get single user
+// =======================
+router.get('/user/:userId', async (req, res) => {
+  try {
+    const user = await User.findById(req.params.userId);
+
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    res.json({ user });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// =======================
+// Get all users
+// =======================
+router.get('/users', async (req, res) => {
+  try {
+    const users = await User.find();
+    res.json({ users });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// =======================
+// Wallet balance
+// =======================
 router.get('/wallet/:userId', async (req, res) => {
   try {
     const user = await User.findById(req.params.userId);
 
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    res.json({
-      wallet: user.wallet
-    });
+    res.json({ wallet: user.wallet });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
-// Walletga pul qo‘shish
+// =======================
+// Add to wallet
+// =======================
 router.post('/wallet/add', async (req, res) => {
   try {
     const { userId, amount } = req.body;
 
     const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
 
-    user.wallet += amount;
+    user.wallet += Number(amount);
     await user.save();
 
     res.json({
@@ -71,17 +105,21 @@ router.post('/wallet/add', async (req, res) => {
   }
 });
 
-// Walletdan pul yechish
+// =======================
+// Remove from wallet
+// =======================
 router.post('/wallet/remove', async (req, res) => {
   try {
     const { userId, amount } = req.body;
 
     const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
     if (user.wallet < amount) {
       return res.status(400).json({ message: "Not enough balance" });
     }
 
-    user.wallet -= amount;
+    user.wallet -= Number(amount);
     await user.save();
 
     res.json({
